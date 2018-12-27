@@ -23,15 +23,15 @@ from typing import NamedTuple, Optional
 
 class LogRecord(NamedTuple):
     ip: bytes
-    username: Optional[str]
     timestamp: datetime
     method: str
     path: str
     protocol: str
     status: int
     size: int
-    referrer: Optional[str]
-    user_agent: Optional[str]
+    username: Optional[str] = None
+    referrer: Optional[str] = None
+    user_agent: Optional[str] = None
 
 
 _common_datetime = '%d/%b/%Y:%H:%M:%S %z'
@@ -85,7 +85,7 @@ def parse_log_line(line: bytes) -> Optional[LogRecord]:
     Parse one log line and return a `LogRecord` if possible, `None` otherwise.
     """
     match = _combined_re.match(line)
-    if not match:
+    if match is None:
         return None
     groups = match.groupdict()
 

@@ -9,7 +9,6 @@ class TestAccessLog(unittest.TestCase):
     def test_simple(self):
         expected = LogRecord(
             ip=socket.inet_pton(socket.AF_INET, '12.34.56.78'),
-            username=None,
             timestamp=datetime(
                 2018, 12, 27, 18, 20, 28,
                 tzinfo=timezone.utc
@@ -19,7 +18,6 @@ class TestAccessLog(unittest.TestCase):
             protocol='HTTP/2.0',
             status=200,
             size=728,
-            referrer=None,
             user_agent='curl/7.52.1'
         )
         log_record = parse_log_line(br'12.34.56.78 - - [27/Dec/2018:18:20:28 +0000] "GET /example '
