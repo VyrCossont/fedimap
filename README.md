@@ -1,3 +1,9 @@
+## Linting
+
+```bash
+flake8 fedimap --max-line-length 100
+```
+
 ## Testing
 
 ```bash

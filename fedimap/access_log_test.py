@@ -4,6 +4,7 @@ import unittest
 
 from fedimap.access_log import parse_log_line, LogRecord
 
+
 class TestAccessLog(unittest.TestCase):
     def test_simple(self):
         expected = LogRecord(

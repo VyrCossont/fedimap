@@ -20,6 +20,7 @@ import socket
 from datetime import datetime
 from typing import NamedTuple, Optional
 
+
 class LogRecord(NamedTuple):
     ip: bytes
     username: Optional[str]
@@ -32,6 +33,7 @@ class LogRecord(NamedTuple):
     referrer: Optional[str]
     user_agent: Optional[str]
 
+
 _common_datetime = '%d/%b/%Y:%H:%M:%S %z'
 
 _combined_re = re.compile(
@@ -40,24 +42,25 @@ _combined_re = re.compile(
         (?P<ip>[0-9a-fA-F.:]+)
         \ # The identd remote logname field is assumed to be empty because it's long obsolete.
         -
-        \ # Note that usernames are not quoted but may have whitespace in them anyway.
+        \ # Optional. Note that usernames are not quoted but may have whitespace in them anyway.
         (?P<username>.+?)
-        \ 
+        \ # See _common_datetime.
         \[(?P<datetime>\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2}\ [+-]\d{4})\]
-        \ 
+        \ # Technically this is just the first line of the request.
         "(?P<method>\w+)\ (?P<path>[^"]+)\ (?P<protocol>\w+/[\d.]+)"
-        \ 
+        \ # HTTP status code.
         (?P<status>\d{3})
-        \ 
+        \ # Response size in bytes.
         (?P<size>\d+)
-        \ 
+        \ # Referrer header (optional).
         "(?P<referrer>[^"]+)"
-        \ 
+        \ # User agent header (optional).
         "(?P<user_agent>[^"]+)"
         $
     ''',
     re.VERBOSE
 )
+
 
 def _unescape_decode(b: bytes) -> str:
     """
@@ -69,11 +72,13 @@ def _unescape_decode(b: bytes) -> str:
     """
     return codecs.escape_decode(b)[0].decode('utf-8')
 
+
 def _dash_empty(s: str) -> Optional[str]:
     """
     Several fields use a dash to indicate the field has no value.
     """
     return None if s == '-' else s
+
 
 def parse_log_line(line: bytes) -> Optional[LogRecord]:
     """
@@ -117,7 +122,10 @@ def parse_log_line(line: bytes) -> Optional[LogRecord]:
     except (UnicodeError, OSError, ValueError):
         return None
 
+
 def parse_log_file(path):
     with open(path, 'rb') as f:
         for line in f:
-            yield parse_log_line(line)
+            log_record = parse_log_line(line)
+            if log_record is not None:
+                yield log_record
