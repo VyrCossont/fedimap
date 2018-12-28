@@ -57,3 +57,7 @@ class TestAccessLog(unittest.TestCase):
         iua = classify_user_agent('Misskey/10.66.2 (https://example.org)')
         self.assertEqual(iua.server, 'Misskey')
         self.assertEqual(iua.url, 'https://example.org')
+
+    def test_postactiv(self):
+        iua = classify_user_agent('postActiv/1.0.3-rc1 (Genesis)')
+        self.assertEqual(iua.server, 'postActiv')

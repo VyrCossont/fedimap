@@ -34,6 +34,7 @@ _servers = {
     'pleroma_mediaproxy': r'(?P<server>Pleroma)/(?P<version>MediaProxy); {url} <(?P<email>[^>]*)>',
     # Hackney is just an Elixir HTTP client, but Elixir is likely to be Pleroma in this context.
     'pleroma_probably': r'(?P<http_client>hackney)/(?P<http_client_version>.+)',
+    'postactiv': r'(?P<server>postActiv)/(?P<version>\S+) \((?P<codename>[^)]+)\)',
 }
 
 _server_res = {
