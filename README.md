@@ -1,3 +1,7 @@
+# fedimap
+
+Web server log ingestor to help you build a map of which instances use which IPs to talk to your instance.
+
 ## Linting
 
 ```bash
