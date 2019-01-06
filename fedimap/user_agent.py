@@ -60,12 +60,14 @@ def classify_user_agent(user_agent: str) -> Optional[InstanceUserAgent]:
     if match is None:
         return None
 
-    # Treat empty groups as None.
+    # Remove empty groups.
     attrs = {
-        k: None if v == '' else v
+        k: v
         for k, v
         in dict(pattern_name=pattern_name, **match.groupdict()).items()
+        if v
     }
+
     # Guess at unlabeled instances by HTTP client.
     if 'server' not in attrs and 'http_client' in attrs:
         attrs['server'] = _server_guesses[attrs['http_client']]

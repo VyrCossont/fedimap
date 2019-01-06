@@ -1,13 +1,17 @@
 from datetime import datetime
-from typing import NamedTuple, Optional
+# noinspection PyUnresolvedReferences
+from typing import NamedTuple, Optional, OrderedDict, Union
 
 from fedimap.user_agent import InstanceUserAgent
 
-__all__ = ['TimeWindow', 'UserAgentEvidence', 'ForwardDNSEvidence', 'ReverseDNSEvidence', 'TLSCertCheckEvidence',
-           'InstanceAPIEvidence']
+__all__ = ['TimeWindowFrozen', 'TimeWindowAcc', 'UserAgentEvidence', 'ForwardDNSEvidence', 'ReverseDNSEvidence',
+           'TLSCertCheckEvidence', 'InstanceAPIEvidence', 'IPEvidence', 'InstanceEvidence', 'Evidence']
 
 
-class TimeWindow:
+TimeWindowFrozen = OrderedDict[str, str]
+
+
+class TimeWindowAcc:
     """
     Accumulator that tracks the min and max times seen (inclusive).
     """
@@ -15,11 +19,13 @@ class TimeWindow:
     max: Optional[datetime] = None
 
     # noinspection PyShadowingBuiltins
-    def __init__(self, min=None, max=None):
+    def __init__(self, min: Optional[datetime] = None, max: Optional[datetime] = None):
+        if (min is None) != (max is None):
+            raise ValueError()
         self.min = min
         self.max = max
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         args = []
         if self.min is not None:
             args.append('min={min!r}'.format(min=self.min))
@@ -28,15 +34,31 @@ class TimeWindow:
         return '{module}.{qualname}({args})'.format(
             module=self.__class__.__module__, qualname=self.__class__.__qualname__, args=', '.join(args))
 
-    def add(self, dt):
-        if self.min is None:
-            self.min = dt
-            self.max = dt
+    def is_empty(self) -> bool:
+        return self.min is None
+
+    def add(self, x: Union[datetime, 'TimeWindowAcc']) -> None:
+        if isinstance(x, TimeWindowAcc):
+            if not x.is_empty():
+                self.add(x.min)
+                self.add(x.max)
         else:
-            if dt < self.min:
-                self.min = dt
-            elif dt > self.max:
-                self.max = dt
+            if self.is_empty():
+                self.min = x
+                self.max = x
+            else:
+                if x < self.min:
+                    self.min = x
+                elif x > self.max:
+                    self.max = x
+
+    def freeze(self) -> TimeWindowFrozen:
+        if self.is_empty():
+            raise ValueError()
+        od = OrderedDict()
+        od['first_seen'] = self.min.strftime('%Y-%m-%d')
+        od['last_seen'] = self.max.strftime('%Y-%m-%d')
+        return od
 
 
 class UserAgentEvidence(NamedTuple):
@@ -48,7 +70,7 @@ class UserAgentEvidence(NamedTuple):
     hostname: str
     port: int
     instance_user_agent: InstanceUserAgent
-    time_window: TimeWindow
+    time_window: TimeWindowAcc
 
 
 class ForwardDNSEvidence(NamedTuple):
@@ -89,3 +111,8 @@ class InstanceAPIEvidence(NamedTuple):
     port: int
     instance_user_agent: InstanceUserAgent
     time: datetime
+
+
+IPEvidence = Union[UserAgentEvidence, ForwardDNSEvidence, ReverseDNSEvidence]
+InstanceEvidence = Union[TLSCertCheckEvidence, InstanceAPIEvidence]
+Evidence = Union[IPEvidence, InstanceEvidence]

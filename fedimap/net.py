@@ -2,6 +2,8 @@ import socket
 from typing import Optional, Tuple
 from urllib.parse import urlsplit
 
+import validators
+
 __all__ = ['af_for_ip', 'fmt_ip', 'extract_hostname_and_port']
 
 
@@ -34,6 +36,8 @@ def extract_hostname_and_port(instance_url: str) -> Optional[Tuple[str, int]]:
     if url.password is not None:
         return None
     if url.hostname is None:
+        return None
+    if not validators.domain(url.hostname):
         return None
     if url.port is None:
         return url.hostname, 443
