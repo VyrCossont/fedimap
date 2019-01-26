@@ -3,17 +3,19 @@ import logging
 import socket
 import sys
 from datetime import datetime, timezone
+# OrderedDict doesn't show in IntelliJ for some reason.
 # noinspection PyUnresolvedReferences
-from typing import DefaultDict, List, OrderedDict, Set, Tuple, Union
+from typing import DefaultDict, Iterable, List, OrderedDict, Set, Tuple, Union
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap  # Hack: prevents !!omap annotation in YAML output
 
 from fedimap.access_log import parse_log_file, LogRecord
-from fedimap.evidence import TimeWindowAcc, UserAgentEvidence, ReverseDNSEvidence, ForwardDNSEvidence,\
-    TLSCertCheckEvidence, InstanceAPIEvidence, IPEvidence, InstanceEvidence
+from fedimap.evidence import TimeWindowAcc, UserAgentEvidence, ReverseDNSEvidence,\
+    ForwardDNSEvidence, TLSCertCheckEvidence, InstanceAPIEvidence, IPEvidence,\
+    InstanceEvidence
 from fedimap.instance_api import UNKNOWN_SERVER_TYPE, get_instance_info
-from fedimap.net import fmt_ip, extract_hostname_and_port
+from fedimap.net import fmt_ip, extract_hostname_and_port, get_domain
 from fedimap.user_agent import classify_user_agent, InstanceUserAgent
 
 
@@ -60,7 +62,15 @@ class IPInfoAcc:
         return CommentedMap(od)  # Hack: prevents !!omap annotation in YAML output
 
 
-InstanceInfoFrozen = OrderedDict[str, Union[bool, str, OrderedDict[str, IPInfoFrozen], List[str]]]
+InstanceInfoFrozen = OrderedDict[
+    str,
+    Union[
+        bool,
+        str,
+        OrderedDict[str, IPInfoFrozen],
+        List[str]
+    ]
+]
 
 
 class InstanceInfoAcc:
@@ -70,12 +80,14 @@ class InstanceInfoAcc:
     # Map of IP to IP info accumulator.
     tls_cert_ok: bool = False
     instance_api_called: bool = False
+    urls: Set[str]
     ips: DefaultDict[bytes, IPInfoAcc]
     user_agents: DefaultDict[InstanceUserAgent, TimeWindowAcc]
     time_window: TimeWindowAcc
 
     # noinspection PyTypeHints
     def __init__(self):
+        self.urls = set()
         self.ips = DefaultDict(IPInfoAcc)
         self.user_agents = DefaultDict(TimeWindowAcc)
         self.time_window = TimeWindowAcc()
@@ -87,6 +99,8 @@ class InstanceInfoAcc:
         elif isinstance(evidence, InstanceAPIEvidence):
             self.instance_api_called = True
             self.time_window.add(evidence.time)
+            if evidence.instance_user_agent.url is not None:
+                self.urls.add(evidence.instance_user_agent.url)
         else:
             time_window = self.ips[evidence.ip].add(evidence)
             self.time_window.add(time_window)
@@ -95,13 +109,16 @@ class InstanceInfoAcc:
 
     def freeze(self) -> InstanceInfoFrozen:
         od = OrderedDict()
+        od['urls'] = sorted(self.urls)
         od['tls_cert_ok'] = self.tls_cert_ok
         od['instance_api_called'] = self.instance_api_called
         od.update(self.time_window.freeze())
 
         # TODO: ignore time windows for now
         od['versions'] = sorted(set(
-            '{server} {version}'.format(server=ua.server, version=ua.version) if ua.version is not None else ua.server
+            '{server} {version}'.format(server=ua.server, version=ua.version)
+            if ua.version is not None
+            else ua.server
             for ua in self.user_agents.keys()
         ))
 
@@ -152,6 +169,7 @@ def main(args: List[str]) -> None:
                     all_evidence.append(UserAgentEvidence(
                         ip=ip,
                         hostname=hostname,
+                        domain=get_domain(hostname),
                         port=port,
                         instance_user_agent=instance_user_agent,
                         time_window=time_window,
@@ -174,10 +192,15 @@ def main(args: List[str]) -> None:
                 all_evidence.append(ReverseDNSEvidence(
                     ip=ip,
                     hostname=alias,
+                    domain=get_domain(alias),
                     time=time,
                 ))
         except OSError:
-            logger.warning("Exception on reverse DNS lookup for %(ip_str)s!", {'ip_str': ip_str}, exc_info=True)
+            logger.warning(
+                "Exception on reverse DNS lookup for %(ip_str)s!",
+                {'ip_str': ip_str},
+                exc_info=True
+            )
 
     for hostname in possible_instance_hostnames:
         try:
@@ -192,10 +215,15 @@ def main(args: List[str]) -> None:
                 all_evidence.append(ForwardDNSEvidence(
                     ip=ip,
                     hostname=hostname,
+                    domain=get_domain(hostname),
                     time=time,
                 ))
         except OSError:
-            logger.warning("Exception on forward DNS lookup for %(hostname)s!", {'hostname': hostname}, exc_info=True)
+            logger.warning(
+                "Exception on forward DNS lookup for %(hostname)s!",
+                {'hostname': hostname},
+                exc_info=True
+            )
 
     for hostname, port in possible_instance_hostnames_and_ports:
         logger.info("%s:%d", hostname, port)  # DEBUG
@@ -205,17 +233,20 @@ def main(args: List[str]) -> None:
         if instance_user_agent is not None:
             all_evidence.append(TLSCertCheckEvidence(
                 hostname=hostname,
+                domain=get_domain(hostname),
                 port=port,
                 time=time,
             ))
 
-            if instance_user_agent.server != UNKNOWN_SERVER_TYPE and instance_user_agent.url is not None:
+            if instance_user_agent.server != UNKNOWN_SERVER_TYPE \
+                    and instance_user_agent.url is not None:
                 reported_hostname_and_port = extract_hostname_and_port(instance_user_agent.url)
                 if reported_hostname_and_port is not None:
                     reported_hostname, reported_port = reported_hostname_and_port
                     if hostname == reported_hostname and port == reported_port:
                         all_evidence.append(InstanceAPIEvidence(
                             hostname=hostname,
+                            domain=get_domain(hostname),
                             port=port,
                             instance_user_agent=instance_user_agent,
                             time=time,
@@ -227,7 +258,7 @@ def main(args: List[str]) -> None:
     # noinspection PyTypeHints
     instances: DefaultDict[str, InstanceInfoAcc] = DefaultDict(InstanceInfoAcc)
     for evidence in all_evidence:
-        instances[evidence.hostname].add(evidence)
+        instances[evidence.domain].add(evidence)
 
     frozen: OrderedDict[str, InstanceInfoFrozen] = OrderedDict()
     for instance in sorted(instances.keys()):

@@ -16,7 +16,7 @@ class InstanceUserAgent(NamedTuple):
 
 
 # Casual regex for an HTTP or HTTPS URL without a query part.
-_url = r'(?P<url>https?://[a-z0-9./-]+)'
+_url = r'(?P<url>https?://[a-z0-9./:-]+)'
 
 _servers = {
     'frendica': r"(?P<server>Friendica) '(?P<codename>[^']+)' (?P<version>[^;]+); {url}",

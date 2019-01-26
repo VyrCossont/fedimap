@@ -24,10 +24,17 @@ def get_instance_info(hostname: str, port: int) -> Optional[InstanceUserAgent]:
     """
     Calls various instance info APIs.
     Does not check to see if the reported hostname and port match the input hostname and port.
+
+    A return from this function indicates that the TLS cert is valid, even if we can't get any
+    instance info, in which case it returns a value with server=UNKNOWN_SERVER_TYPE.
+    TODO: return a Union instead.
+
     TODO: could be faster if we had a hint as to what the server was before talking to it?
     """
     api_scheme = 'https'
-    api_netloc = hostname if port == 443 else '{hostname}:{port}'.format(hostname=hostname, port=port)
+    api_netloc = hostname if port == 443 else '{hostname}:{port}'.format(
+        hostname=hostname, port=port
+    )
     api_query = None
     api_fragment = None
 
@@ -44,7 +51,8 @@ def get_instance_info(hostname: str, port: int) -> Optional[InstanceUserAgent]:
         # Works for Pleroma, might work for GNU social.
         # Note that you're supposed to look this path up from /.well-known/nodeinfo.
         try:
-            api_url = urlunsplit((api_scheme, api_netloc, '/nodeinfo/2.0.json', api_query, api_fragment))
+            urlparts = (api_scheme, api_netloc, '/nodeinfo/2.0.json', api_query, api_fragment)
+            api_url = urlunsplit(urlparts)
             resp = requests.get(api_url, timeout=timeout)
             if resp.status_code == 200:
                 doc = resp.json()
@@ -52,11 +60,16 @@ def get_instance_info(hostname: str, port: int) -> Optional[InstanceUserAgent]:
                 server = software.get('name')
                 version = software.get('version')
         except json.decoder.JSONDecodeError:
-            _logger.warning("Couldn't decode JSON response for %(api_url)s!", {'api_url': api_url}, exc_info=True)
+            _logger.warning(
+                "Couldn't decode JSON response for %(api_url)s!",
+                {'api_url': api_url},
+                exc_info=True
+            )
 
         # Mastodon instance API. Should work for Mastodon and Pleroma.
         try:
-            api_url = urlunsplit((api_scheme, api_netloc, '/api/v1/instance', api_query, api_fragment))
+            urlparts = (api_scheme, api_netloc, '/api/v1/instance', api_query, api_fragment)
+            api_url = urlunsplit(urlparts)
             resp = requests.get(api_url, timeout=timeout)
             if resp.status_code == 200:
                 doc = resp.json()
@@ -78,20 +91,30 @@ def get_instance_info(hostname: str, port: int) -> Optional[InstanceUserAgent]:
                         version = groups.get('version')
 
         except json.decoder.JSONDecodeError:
-            _logger.warning("Couldn't decode JSON response for %(api_url)s!", {'api_url': api_url}, exc_info=True)
+            _logger.warning(
+                "Couldn't decode JSON response for %(api_url)s!",
+                {'api_url': api_url},
+                exc_info=True
+            )
 
         # TODO: neither of these endpoints work for Misskey or Friendica.
 
     except requests.exceptions.SSLError:
-        _logger.warning("Couldn't verify TLS cert for %(api_netloc)s!", {'api_netloc': api_netloc}, exc_info=True)
+        _logger.warning(
+            "Couldn't verify TLS cert for %(api_netloc)s!",
+            {'api_netloc': api_netloc},
+            exc_info=True
+        )
         return None
 
     except Exception:
-        _logger.warning("Something else went wrong while calling %(api_netloc)s instance info APIs!",
-                        {'api_netloc': api_netloc}, exc_info=True)
+        _logger.warning(
+            "Something else went wrong while calling %(api_netloc)s instance info APIs!",
+            {'api_netloc': api_netloc},
+            exc_info=True
+        )
         return None
 
-    # A return from this function indicates that the TLS cert is valid even if we can't get any instance info.
     server = server or UNKNOWN_SERVER_TYPE
 
     return InstanceUserAgent(

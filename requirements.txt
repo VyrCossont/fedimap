@@ -1,3 +1,4 @@
+publicsuffix2
 requests
 ruamel.yaml
 validators

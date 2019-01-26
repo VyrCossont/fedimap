@@ -2,9 +2,10 @@ import socket
 from typing import Optional, Tuple
 from urllib.parse import urlsplit
 
+import publicsuffix2
 import validators
 
-__all__ = ['af_for_ip', 'fmt_ip', 'extract_hostname_and_port']
+__all__ = ['af_for_ip', 'fmt_ip', 'extract_hostname_and_port', 'get_domain']
 
 
 def af_for_ip(ip: bytes) -> socket.AddressFamily:
@@ -43,3 +44,25 @@ def extract_hostname_and_port(instance_url: str) -> Optional[Tuple[str, int]]:
         return url.hostname, 443
     else:
         return url.hostname, url.port
+
+
+# Domains where it's known that subdomains will be different instances.
+_multi_user_domains = frozenset([
+    'masto.host',
+])
+
+
+def get_domain(hostname: str) -> str:
+    """
+    Get the first private part of a hostname after the public suffix,
+    but with exceptions where it's known that different hosts have different owners.
+
+    There's one current exception to the PSL: masto.host.
+    """
+    # Note: `publicsuffix2.get_public_suffix` really should have been called `get_private_suffix`.
+    # `get_public_suffix('example.com') sounds like it'd return `com`,
+    # but actually returns `example.com`.
+    private_suffix = publicsuffix2.get_public_suffix(hostname)
+    if private_suffix in _multi_user_domains:
+        return hostname
+    return private_suffix

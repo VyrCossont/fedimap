@@ -1,11 +1,15 @@
 from datetime import datetime
+# OrderedDict doesn't show in IntelliJ for some reason.
 # noinspection PyUnresolvedReferences
 from typing import NamedTuple, Optional, OrderedDict, Union
 
 from fedimap.user_agent import InstanceUserAgent
 
-__all__ = ['TimeWindowFrozen', 'TimeWindowAcc', 'UserAgentEvidence', 'ForwardDNSEvidence', 'ReverseDNSEvidence',
-           'TLSCertCheckEvidence', 'InstanceAPIEvidence', 'IPEvidence', 'InstanceEvidence', 'Evidence']
+__all__ = [
+    'TimeWindowFrozen', 'TimeWindowAcc', 'UserAgentEvidence', 'ForwardDNSEvidence',
+    'ReverseDNSEvidence', 'TLSCertCheckEvidence', 'InstanceAPIEvidence', 'IPEvidence',
+    'InstanceEvidence', 'Evidence'
+]
 
 
 TimeWindowFrozen = OrderedDict[str, str]
@@ -32,7 +36,10 @@ class TimeWindowAcc:
         if self.max is not None:
             args.append('max={min!r}'.format(min=self.min))
         return '{module}.{qualname}({args})'.format(
-            module=self.__class__.__module__, qualname=self.__class__.__qualname__, args=', '.join(args))
+            module=self.__class__.__module__,
+            qualname=self.__class__.__qualname__,
+            args=', '.join(args)
+        )
 
     def is_empty(self) -> bool:
         return self.min is None
@@ -68,6 +75,7 @@ class UserAgentEvidence(NamedTuple):
     """
     ip: bytes
     hostname: str
+    domain: str
     port: int
     instance_user_agent: InstanceUserAgent
     time_window: TimeWindowAcc
@@ -80,6 +88,7 @@ class ForwardDNSEvidence(NamedTuple):
     """
     ip: bytes
     hostname: str
+    domain: str
     time: datetime
 
 
@@ -90,14 +99,17 @@ class ReverseDNSEvidence(NamedTuple):
     """
     ip: bytes
     hostname: str
+    domain: str
     time: datetime
 
 
 class TLSCertCheckEvidence(NamedTuple):
     """
-    Evidence that a given hostname and port was serving with a valid TLS cert for it at some time.
+    Evidence that a given hostname and port was serving with a valid TLS cert for it
+    at some time.
     """
     hostname: str
+    domain: str
     port: int
     time: datetime
 
@@ -108,6 +120,7 @@ class InstanceAPIEvidence(NamedTuple):
     and identified itself with the matching hostname and port.
     """
     hostname: str
+    domain: str
     port: int
     instance_user_agent: InstanceUserAgent
     time: datetime
